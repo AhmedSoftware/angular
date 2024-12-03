@@ -50,6 +50,8 @@ import {
   withNoXsrfProtection,
   withRequestsMadeViaParent,
   withXsrfConfiguration,
+  CHECKED_INTERCEPTORS,
+  ensureInterceptorRegistered,
 } from '../src/provider';
 
 describe('without provideHttpClientTesting', () => {
@@ -162,12 +164,32 @@ describe('provideHttpClient', () => {
           provideHttpClientTesting(),
         ],
       });
-
+    
+      const checkedInterceptors = TestBed.inject(CHECKED_INTERCEPTORS);
+      expect(checkedInterceptors.has('alpha')).toBe(true);
+      expect(checkedInterceptors.has('beta')).toBe(true);
+    
       TestBed.inject(HttpClient).get('/test', {responseType: 'text'}).subscribe();
       const req = TestBed.inject(HttpTestingController).expectOne('/test');
       expect(req.request.headers.get('X-Tag')).toEqual('alpha,beta');
       req.flush('');
     });
+    
+    it('should throw error if interceptor is not registered', () => {
+      TestBed.configureTestingModule({
+        providers: [
+          provideHttpClient(),
+          provideHttpClientTesting(),
+        ],
+      });
+    
+      expect(() => {
+        ensureInterceptorRegistered('missingInterceptor');
+      }).toThrowError(
+        'Required interceptor "missingInterceptor" is not registered. Please add it using withInterceptors().'
+      );
+    });
+    
 
     it('should accept multiple separate interceptor configs', () => {
       TestBed.configureTestingModule({
