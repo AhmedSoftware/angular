@@ -223,11 +223,8 @@ function findMatchingDehydratedViewForDeferBlock(
   lContainer: LContainer,
   lDetails: LDeferBlockDetails,
 ): DehydratedContainerView | null {
-  // TODO(incremental-hydration): extract into a separate util function and use in relevant places.
-  const views = lContainer[DEHYDRATED_VIEWS];
-  if (views === null || views.length === 0) {
-    return null;
-  }
+  const views = getDehydratedViewsFromContainer(lContainer);
+  if (views === null) return null;
 
   // Find matching view based on serialized defer block state.
   // TODO(incremental-hydration): reconcile this logic with the regular logic that looks up
@@ -237,6 +234,11 @@ function findMatchingDehydratedViewForDeferBlock(
       (view: any) => view.data[SERIALIZED_DEFER_BLOCK_STATE] === lDetails[DEFER_BLOCK_STATE],
     ) ?? null
   );
+}
+
+function getDehydratedViewsFromContainer(lContainer: LContainer): DehydratedContainerView[] | null {
+  const views = lContainer[DEHYDRATED_VIEWS];
+  return views && views.length > 0 ? views : null;
 }
 
 /**
@@ -284,9 +286,8 @@ function applyDeferBlockState(
     // Render either when we don't have dehydrated views at all (e.g. client rendering)
     // or when dehydrated view is found (in which case we hydrate).
     // Otherwise, do nothing, since we'd end up erasing SSR'ed content.
-    // TODO(incremental-hydration): Use the util function for checking dehydrated views mentioned above
-    const isClientOnly =
-      lContainer[DEHYDRATED_VIEWS] === null || lContainer[DEHYDRATED_VIEWS].length === 0;
+
+    const isClientOnly = getDehydratedViewsFromContainer(lContainer) === null;
     if (isClientOnly || dehydratedView) {
       // Erase dehydrated view info, so that it's not removed later
       // by post-hydration cleanup process.
@@ -312,8 +313,10 @@ function applyDeferBlockState(
     // - for example, handle a situation when a block was in the "completed" state
     //   on the server, but the loading failing on the client. How do we reconcile and cleanup?
 
-    // TODO(incremental-hydration): should we also invoke if newState === DeferBlockState.Error?
-    if (newState === DeferBlockState.Complete && Array.isArray(lDetails[ON_COMPLETE_FNS])) {
+    if (
+      (newState === DeferBlockState.Complete || newState === DeferBlockState.Error) &&
+      Array.isArray(lDetails[ON_COMPLETE_FNS])
+    ) {
       for (const callback of lDetails[ON_COMPLETE_FNS]) {
         callback();
       }
