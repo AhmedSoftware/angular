@@ -37,7 +37,7 @@ import {IS_INCREMENTAL_HYDRATION_ENABLED, JSACTION_BLOCK_ELEMENT_MAP} from './to
 import {RuntimeError, RuntimeErrorCode} from '../errors';
 import {DeferBlockTrigger, HydrateTriggerDetails} from '../defer/interfaces';
 import {hoverEventNames, interactionEventNames} from '../defer/dom_triggers';
-import {DEHYDRATED_BLOCK_REGISTRY} from '../defer/registry';
+import {DEHYDRATED_BLOCK_REGISTRY, DehydratedBlockRegistry} from '../defer/registry';
 import {sharedMapFunction} from '../event_delegation_utils';
 
 /**
@@ -413,6 +413,17 @@ export function assertSsrIdDefined(ssrUniqueId: unknown) {
   assertDefined(
     ssrUniqueId,
     'Internal error: expecting an SSR id for a defer block that should be hydrated, but the id is not present',
+  );
+}
+
+/** Throws an error if the ssrUniqueId on the LDeferBlockDetails is not present  */
+export function assertDeferBlockInRegistry(
+  registry: DehydratedBlockRegistry,
+  deferBlockId: string,
+) {
+  assertDefined(
+    registry.get(deferBlockId),
+    'Internal error: expecting a defer block to be present in the dehydrated block registry, but the defer block is not present',
   );
 }
 

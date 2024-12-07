@@ -13,6 +13,7 @@ import {RuntimeError, RuntimeErrorCode} from '../errors';
 import {cleanupHydratedDeferBlocks} from '../hydration/cleanup';
 import {BlockSummary, ElementTrigger, NUM_ROOT_NODES} from '../hydration/interfaces';
 import {
+  assertDeferBlockInRegistry,
   assertSsrIdDefined,
   getParentBlockHydrationQueue,
   isIncrementalHydrationEnabled,
@@ -35,13 +36,13 @@ import {
 import {onViewport} from './dom_triggers';
 import {onIdle} from './idle_scheduler';
 import {
+  DEFER_BLOCK_STATE,
   DeferBlockBehavior,
   DeferBlockState,
   DeferBlockTrigger,
   DeferDependenciesLoadingState,
   LDeferBlockDetails,
   ON_COMPLETE_FNS,
-  SSR_BLOCK_STATE,
   SSR_UNIQUE_ID,
   TDeferBlockDetails,
   TDeferDetailsFlags,
@@ -397,14 +398,20 @@ export async function triggerHydrationFromBlockName(
   for (const dehydratedBlockId of hydrationQueue) {
     await triggerResourceLoadingForHydration(dehydratedBlockId, dehydratedBlockRegistry);
     await nextRender(injector);
-    // TODO(incremental-hydration): assert (in dev mode) that a defer block is present in the dehydrated registry
-    // at this point. If not - it means that the block has not been hydrated, for example due to different
-    // `@if` conditions on the client and the server. If we detect this case, we should also do the cleanup
-    // of all child block (promises, registry state, etc).
-    // TODO(incremental-hydration): call `rejectFn` when lDetails[DEFER_BLOCK_STATE] is `DeferBlockState.Error`.
-    blocksBeingHydrated.get(dehydratedBlockId)!.resolve();
+    if (typeof ngDevMode === 'undefined' || ngDevMode) {
+      assertDeferBlockInRegistry(dehydratedBlockRegistry, dehydratedBlockId);
+      // TODO(incremental-hydration): the block has not been hydrated, for example due to different
+      // `@if` conditions on the client and the server. We should also do the cleanup of all child
+      // block (promises, registry state, etc).
+    }
+    const deferBlock = dehydratedBlockRegistry.get(dehydratedBlockId)!;
+    const lDetails = getLDeferBlockDetails(deferBlock.lView, deferBlock.tNode);
+    const hydratingBlockPromise = blocksBeingHydrated.get(dehydratedBlockId)!;
 
-    // TODO(incremental-hydration): consider adding a wait for stability here
+    if (lDetails[DEFER_BLOCK_STATE] === DeferBlockState.Error) {
+      hydratingBlockPromise.reject();
+    }
+    hydratingBlockPromise.resolve();
   }
 
   // Await hydration completion for the requested block.
