@@ -75,6 +75,19 @@ function makeHttpFeature<KindT extends HttpFeatureKind>(
 }
 
 /**
+ * Token to track registered interceptors.
+ *  @publicApi
+ */
+export const CHECKED_INTERCEPTORS = new InjectionToken<Set<string>>(
+  'CHECKED_INTERCEPTORS',
+  {
+    factory: () => new Set<string>(), // Initialize an empty set for tracking.
+  }
+);
+
+/**
+ * Configures Angular's `HttpClient` service to be available for injection.
+ *
  * Configures Angular's `HttpClient` service to be available for injection.
  *
  * By default, `HttpClient` will be configured for injection with its default options for XSRF
@@ -161,6 +174,9 @@ export function withInterceptors(
   return makeHttpFeature(
     HttpFeatureKind.Interceptors,
     interceptorFns.map((interceptorFn) => {
+      const interceptorName = interceptorFn.name || 'AnonymousInterceptor';
+      const checkedInterceptors = inject(CHECKED_INTERCEPTORS);
+      checkedInterceptors.add(interceptorName);
       return {
         provide: HTTP_INTERCEPTOR_FNS,
         useValue: interceptorFn,
@@ -173,6 +189,19 @@ export function withInterceptors(
 const LEGACY_INTERCEPTOR_FN = new InjectionToken<HttpInterceptorFn>(
   ngDevMode ? 'LEGACY_INTERCEPTOR_FN' : '',
 );
+
+/**
+ * Ensures that a required interceptor is registered.
+ *  @publicApi
+ */
+export function ensureInterceptorRegistered(interceptorName: string): void {
+  const checkedInterceptors = inject(CHECKED_INTERCEPTORS);
+  if (!checkedInterceptors.has(interceptorName)) {
+    throw new Error(
+      `Required interceptor "${interceptorName}" is not registered. Please add it using withInterceptors().`
+    );
+  }
+}
 
 /**
  * Includes class-based interceptors configured using a multi-provider in the current injector into
